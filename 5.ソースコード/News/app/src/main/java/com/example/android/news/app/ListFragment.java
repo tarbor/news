@@ -1,5 +1,8 @@
 package com.example.android.news.app;
 
+import android.content.ContentUris;
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -15,6 +18,8 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
+
+import com.example.android.news.app.data.NewsContract;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,6 +44,7 @@ import java.util.List;
 public class ListFragment extends Fragment {
 
     ArrayAdapter<String> mNewsAdapter;
+    String[] mNewsDetailStr;
 
     public ListFragment() {
     }
@@ -48,6 +54,7 @@ public class ListFragment extends Fragment {
         super.onCreate(savedInstanceState);
         // Add this line in order for this fragment to handle menu events.
         setHasOptionsMenu(true);
+
     }
 
     @Override
@@ -97,9 +104,10 @@ public class ListFragment extends Fragment {
 
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-                String forecast = mNewsAdapter.getItem(position);
+//                String detailNews = mNewsDetailStr[position];
+                String listIndex = String.valueOf(position);
                 Intent intent = new Intent(getActivity(), DetailActivity.class)
-                        .putExtra(Intent.EXTRA_TEXT, forecast);
+                        .putExtra(Intent.EXTRA_TEXT, listIndex);
                 startActivity(intent);
             }
         });
@@ -108,7 +116,7 @@ public class ListFragment extends Fragment {
     }
 
     private void updateNews() {
-        FetchNewsTask newsTask = new FetchNewsTask();
+        FetchNewsTask newsTask = new FetchNewsTask(getContext());
         newsTask.execute();
     }
 
@@ -121,6 +129,43 @@ public class ListFragment extends Fragment {
     public class FetchNewsTask extends AsyncTask<String, Void, String[]> {
 
         private final String LOG_TAG = FetchNewsTask.class.getSimpleName();
+        private final Context mContext;
+
+        public FetchNewsTask(Context context) {
+            mContext = context;
+        }
+
+        int clearNews() {
+            int result = mContext.getContentResolver().delete(NewsContract.NewsEntry.CONTENT_URI, null, null);
+            return result;
+        }
+
+        long insertNews(String listindex, String link, String date, String title, String content) {
+            long newsId;
+
+            // Now that the content provider is set up, inserting rows of data is pretty simple.
+            // First create a ContentValues object to hold the data you want to insert.
+            ContentValues newsValues = new ContentValues();
+
+            // Then add the data, along with the corresponding name of the data type,
+            // so the content provider knows what kind of value is being inserted.
+            newsValues.put(NewsContract.NewsEntry.COLUMN_LISTINDEX, listindex);
+            newsValues.put(NewsContract.NewsEntry.COLUMN_LINK, link);
+            newsValues.put(NewsContract.NewsEntry.COLUMN_DATE, date);
+            newsValues.put(NewsContract.NewsEntry.COLUMN_TITLE, title);
+            newsValues.put(NewsContract.NewsEntry.COLUMN_CONTENT, content);
+
+            // Finally, insert location data into the database.
+            Uri insertedUri = mContext.getContentResolver().insert(
+                    NewsContract.NewsEntry.CONTENT_URI,
+                    newsValues
+            );
+
+            // The resulting URI contains the ID for the row.  Extract the locationId from the Uri.
+            newsId = ContentUris.parseId(insertedUri);
+
+            return newsId;
+        }
 
         /**
          * Take the String representing the complete forecast in JSON Format and
@@ -145,13 +190,18 @@ public class ListFragment extends Fragment {
             JSONArray newsArray = feedJson.getJSONArray(OWM_LIST);
 
             String[] resultStrs = new String[numNews];
+            mNewsDetailStr = new String[numNews];
 
+            clearNews();
             for(int i = 0; i < newsArray.length(); i++) {
                 // For now, using the format "Day, description, hi/low"
+                String listindex;
                 String title;
                 String link;
                 String content;
-                String day;
+                String date;
+
+                listindex = String.valueOf(i);
 
                 // Get the JSON object representing the day
                 JSONObject elementNews = newsArray.getJSONObject(i);
@@ -160,13 +210,14 @@ public class ListFragment extends Fragment {
                 title = elementNews.getString(OWM_TITLE);
                 link = elementNews.getString(OWM_LINK);
                 content = elementNews.getString(OWM_CONTENT);
-                day = elementNews.getString(OWM_DATE);
+                date = elementNews.getString(OWM_DATE);
 
-                resultStrs[i] = title + " - " + day + " - " + content + " - " + link;
+                resultStrs[i] = title + " - " + date;
+//                mNewsDetailStr[i] = content + " - " + date + " - " + link;
+
+                insertNews( listindex, link, date, title, content );
             }
-
             return resultStrs;
-
         }
 
         @Override
@@ -270,4 +321,5 @@ public class ListFragment extends Fragment {
             }
         }
     }
+
 }

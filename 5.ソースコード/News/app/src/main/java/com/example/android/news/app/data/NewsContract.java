@@ -19,7 +19,6 @@ import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.net.Uri;
 import android.provider.BaseColumns;
-import android.text.format.Time;
 
 /**
  * Defines table and column names for the weather database.
@@ -43,16 +42,6 @@ public class NewsContract {
     // At least, let's hope not.  Don't be that dev, reader.  Don't be that dev.
     public static final String PATH_NEWS = "news";
 
-    // To make it easy to query for the exact date, we normalize all dates that go into
-    // the database to the start of the the Julian day at UTC.
-    public static long normalizeDate(long startDate) {
-        // normalize the start date to the beginning of the (UTC) day
-        Time time = new Time();
-        time.set(startDate);
-        int julianDay = Time.getJulianDay(startDate, time.gmtoff);
-        return time.setJulianDay(julianDay);
-    }
-
     /* Inner class that defines the table contents of the weather table */
     public static final class NewsEntry implements BaseColumns {
 
@@ -61,9 +50,13 @@ public class NewsContract {
 
         public static final String CONTENT_TYPE =
                 ContentResolver.CURSOR_DIR_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_NEWS;
+        public static final String CONTENT_ITEM_TYPE =
+                ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_NEWS;
 
         public static final String TABLE_NAME = "news";
 
+        // Weather id as returned by API, to identify the icon to be used
+        public static final String COLUMN_LISTINDEX = "listindex";
         // Weather id as returned by API, to identify the icon to be used
         public static final String COLUMN_LINK = "link";
         // Date, stored as long in milliseconds since the epoch
@@ -77,39 +70,15 @@ public class NewsContract {
             return ContentUris.withAppendedId(CONTENT_URI, id);
         }
 
-        /*
-            Student: This is the buildWeatherLocation function you filled in.
-         */
-        public static Uri buildNewsLocation(String locationSetting) {
-            return CONTENT_URI.buildUpon().appendPath(locationSetting).build();
-        }
-
-        public static Uri buildNewsLocationWithStartDate(
+        public static Uri buildWeatherLocationWithStartDate(
                 String locationSetting, long startDate) {
-            long normalizedDate = normalizeDate(startDate);
             return CONTENT_URI.buildUpon().appendPath(locationSetting)
-                    .appendQueryParameter(COLUMN_DATE, Long.toString(normalizedDate)).build();
+                    .appendQueryParameter(COLUMN_DATE, Long.toString(startDate)).build();
         }
 
-        public static Uri buildNewsLocationWithDate(String locationSetting, long date) {
-            return CONTENT_URI.buildUpon().appendPath(locationSetting)
-                    .appendPath(Long.toString(normalizeDate(date))).build();
-        }
-
-        public static String getLocationSettingFromUri(Uri uri) {
+        public static String getListIndexFromUri(Uri uri) {
             return uri.getPathSegments().get(1);
         }
 
-        public static long getDateFromUri(Uri uri) {
-            return Long.parseLong(uri.getPathSegments().get(2));
-        }
-
-        public static long getStartDateFromUri(Uri uri) {
-            String dateString = uri.getQueryParameter(COLUMN_DATE);
-            if (null != dateString && dateString.length() > 0)
-                return Long.parseLong(dateString);
-            else
-                return 0;
-        }
     }
 }

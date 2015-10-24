@@ -3,4 +3,3 @@
     android:name="com.example.android.news.app.DetailFragment"
     tools:layout="@layout/fragment_detail" android:layout_width="match_parent"
     android:layout_height="match_parent" />
-

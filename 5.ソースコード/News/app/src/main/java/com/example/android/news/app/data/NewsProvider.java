@@ -31,9 +31,7 @@ public class NewsProvider extends ContentProvider {
     private com.example.android.news.app.data.NewsDbHelper mOpenHelper;
 
     static final int NEWS = 100;
-    static final int NEWS_WITH_LOCATION = 101;
-    static final int NEWS_WITH_LOCATION_AND_DATE = 102;
-    static final int LOCATION = 300;
+    static final int NEWS_WITH_LISTINDEX = 101;
 
     private static final SQLiteQueryBuilder sNewsQueryBuilder;
 
@@ -45,21 +43,19 @@ public class NewsProvider extends ContentProvider {
         sNewsQueryBuilder.setTables(NewsContract.NewsEntry.TABLE_NAME);
     }
 
-    //location.location_setting = ? AND date = ?
-    private static final String sLinkAndDaySelection =
+    //news.news_id = ?
+    private static final String sDetailNewsSelection =
             NewsContract.NewsEntry.TABLE_NAME +
-                    "." + NewsContract.NewsEntry.COLUMN_LINK + " = ? AND " +
-                    NewsContract.NewsEntry.COLUMN_DATE + " = ? ";
+                    "." + NewsContract.NewsEntry.COLUMN_LISTINDEX + " = ? ";
 
-    private Cursor getNewsByLocationSetting(Uri uri, String[] projection, String sortOrder) {
-        String locationSetting = NewsContract.NewsEntry.getLocationSettingFromUri(uri);
-        long startDate = NewsContract.NewsEntry.getStartDateFromUri(uri);
-
-        String[] selectionArgs;
+    private Cursor getNewsByListIndex(
+            Uri uri, String[] projection, String sortOrder) {
         String selection;
+        selection = sDetailNewsSelection;
 
-        selection = sLinkAndDaySelection;
-        selectionArgs = new String[]{locationSetting};
+        String listIndex = NewsContract.NewsEntry.getListIndexFromUri(uri);
+        String[] selectionArgs;
+        selectionArgs = new String[]{listIndex};
 
         return sNewsQueryBuilder.query(mOpenHelper.getReadableDatabase(),
                 projection,
@@ -89,8 +85,7 @@ public class NewsProvider extends ContentProvider {
 
         // For each type of URI you want to add, create a corresponding code.
         matcher.addURI(authority, NewsContract.PATH_NEWS, NEWS);
-        matcher.addURI(authority, NewsContract.PATH_NEWS + "/*", NEWS_WITH_LOCATION);
-        matcher.addURI(authority, NewsContract.PATH_NEWS + "/*/#", NEWS_WITH_LOCATION_AND_DATE);
+        matcher.addURI(authority, NewsContract.PATH_NEWS + "/*", NEWS_WITH_LISTINDEX);
 
         return matcher;
     }
@@ -116,12 +111,9 @@ public class NewsProvider extends ContentProvider {
         final int match = sUriMatcher.match(uri);
 
         switch (match) {
-            // Student: Uncomment and fill out these two cases
-//            case NEWS_WITH_LOCATION_AND_DATE:
-//            case NEWS_WITH_LOCATION:
-            case NEWS:
+            case NEWS_WITH_LISTINDEX:
                 return NewsContract.NewsEntry.CONTENT_TYPE;
-            case LOCATION:
+            case NEWS:
                 return NewsContract.NewsEntry.CONTENT_TYPE;
             default:
                 throw new UnsupportedOperationException("Unknown uri: " + uri);
@@ -135,19 +127,22 @@ public class NewsProvider extends ContentProvider {
         // and query the database accordingly.
         Cursor retCursor;
         switch (sUriMatcher.match(uri)) {
-            // "weather/*"
-            case NEWS_WITH_LOCATION: {
-                retCursor = getNewsByLocationSetting(uri, projection, sortOrder);
+            // "news/*"
+            case NEWS_WITH_LISTINDEX: {
+                retCursor = getNewsByListIndex(uri, projection, sortOrder);
                 break;
             }
-            // "weather"
+            // "news"
             case NEWS: {
-                retCursor = null;
-                break;
-            }
-            // "location"
-            case LOCATION: {
-                retCursor = null;
+                retCursor = mOpenHelper.getReadableDatabase().query(
+                        NewsContract.NewsEntry.TABLE_NAME,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null,
+                        null,
+                        sortOrder
+                );
                 break;
             }
 
@@ -169,7 +164,6 @@ public class NewsProvider extends ContentProvider {
 
         switch (match) {
             case NEWS: {
-                normalizeDate(values);
                 long _id = db.insert(NewsContract.NewsEntry.TABLE_NAME, null, values);
                 if ( _id > 0 )
                     returnUri = NewsContract.NewsEntry.buildNewsUri(_id);
@@ -186,34 +180,48 @@ public class NewsProvider extends ContentProvider {
 
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        // Student: Start by getting a writable database
+        final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
 
-        // Student: Use the uriMatcher to match the NEWS and LOCATION URI's we are going to
-        // handle.  If it doesn't match these, throw an UnsupportedOperationException.
+        final int match = sUriMatcher.match(uri);
+        int rowsDeleted;
 
-        // Student: A null value deletes all rows.  In my implementation of this, I only notified
-        // the uri listeners (using the content resolver) if the rowsDeleted != 0 or the selection
-        // is null.
-        // Oh, and you should notify the listeners here.
-
-        // Student: return the actual rows deleted
-        return 0;
-    }
-
-    private void normalizeDate(ContentValues values) {
-        // normalize the date value
-        if (values.containsKey(NewsContract.NewsEntry.COLUMN_DATE)) {
-            long dateValue = values.getAsLong(NewsContract.NewsEntry.COLUMN_DATE);
-            values.put(NewsContract.NewsEntry.COLUMN_DATE, NewsContract.normalizeDate(dateValue));
+        if (null == selection) selection = "1";
+        switch (match) {
+            case NEWS: {
+                rowsDeleted = db.delete(NewsContract.NewsEntry.TABLE_NAME, selection, selectionArgs);
+                break;
+            }
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
         }
+
+        if (rowsDeleted != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return rowsDeleted;
     }
 
     @Override
     public int update(
             Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        // Student: This is a lot like the delete function.  We return the number of rows impacted
-        // by the update.
-        return 0;
+        final SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+
+        final int match = sUriMatcher.match(uri);
+        int rowsUpdated;
+
+        switch (match) {
+            case NEWS: {
+                rowsUpdated = db.update(NewsContract.NewsEntry.TABLE_NAME, values, selection, selectionArgs);
+                break;
+            }
+            default:
+                throw new UnsupportedOperationException("Unknown uri: " + uri);
+        }
+
+        if (rowsUpdated != 0) {
+            getContext().getContentResolver().notifyChange(uri, null);
+        }
+        return rowsUpdated;
     }
 
     @Override
@@ -226,7 +234,6 @@ public class NewsProvider extends ContentProvider {
                 int returnCount = 0;
                 try {
                     for (ContentValues value : values) {
-                        normalizeDate(value);
                         long _id = db.insert(NewsContract.NewsEntry.TABLE_NAME, null, value);
                         if (_id != -1) {
                             returnCount++;

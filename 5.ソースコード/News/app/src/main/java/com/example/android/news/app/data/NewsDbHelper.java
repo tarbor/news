@@ -27,7 +27,7 @@ import com.example.android.news.app.data.NewsContract.NewsEntry;
 public class NewsDbHelper extends SQLiteOpenHelper {
 
     // If you change the database schema, you must increment the database version.
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     static final String DATABASE_NAME = "news.db";
 
@@ -47,6 +47,7 @@ public class NewsDbHelper extends SQLiteOpenHelper {
                 NewsEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
 
                 // the ID of the location entry associated with this weather data
+                NewsEntry.COLUMN_LISTINDEX + " TEXT NOT NULL, " +
                 NewsEntry.COLUMN_LINK + " TEXT NOT NULL, " +
                 NewsEntry.COLUMN_DATE + " TEXT NOT NULL, " +
                 NewsEntry.COLUMN_TITLE + " TEXT NOT NULL, " +
